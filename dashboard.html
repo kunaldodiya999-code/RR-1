@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>RR Monitor Compact Sync</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+margin:0;
+padding:10px;
+font-family:Arial;
+background:#0f1117;
+color:white;
+font-size:13px;
+}
+
+.topbar{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:10px;
+}
+
+.righttools{
+display:flex;
+gap:8px;
+align-items:center;
+}
+
+h1{
+margin:0;
+font-size:22px;
+}
+
+/* ===== COMPACT BUTTON SIZE ===== */
+
+.btnsm{
+height:36px;
+min-width:74px;
+padding:0 12px;
+border:none;
+border-radius:18px;
+font-size:12px;
+cursor:pointer;
+color:#fff;
+background:#2962ff;
+}
+
+.logout{
+background:#d50000;
+}
+
+.redbtn{
+background:#d50000;
+}
+
+.gray{
+background:#666;
+}
+
+/* ===== SMALL TOGGLE ===== */
+
+.labelwrap{
+display:flex;
+align-items:center;
+gap:6px;
+}
+
+.switch3d{
+display:flex;
+align-items:center;
+justify-content:space-between;
+width:112px;
+height:36px;
+padding:3px;
+border-radius:18px;
+text-decoration:none;
+box-shadow:inset 0 0 6px rgba(0,0,0,.45);
+}
+
+.switch3d .txt{
+flex:1;
+text-align:center;
+font-size:11px;
+font-weight:bold;
+color:rgba(0,0,0,.45);
+}
+
+.switch3d .knob{
+width:30px;
+height:30px;
+border-radius:50%;
+background:#1c1c1c;
+box-shadow:0 3px 8px rgba(0,0,0,.45);
+}
+
+.switch-on{
+background:#35c84a;
+}
+
+.switch-on .knob{
+order:2;
+}
+
+.switch-off{
+background:#ff2b2b;
+}
+
+.switch-off .knob{
+order:0;
+}
+
+/* ===== GRID ===== */
+
+.grid{
+display:grid;
+grid-template-columns:repeat(6,1fr);
+gap:8px;
+margin-bottom:10px;
+}
+
+.card{
+background:#1a1d26;
+padding:10px;
+border-radius:10px;
+text-align:center;
+}
+
+.value{
+font-size:20px;
+font-weight:bold;
+margin-top:4px;
+}
+
+.green{color:#00e676;}
+.red{color:#ff5252;}
+.blue{color:#40c4ff;}
+
+.panel{
+background:#1a1d26;
+padding:10px;
+border-radius:10px;
+margin-bottom:10px;
+}
+
+.row{
+display:flex;
+gap:6px;
+flex-wrap:wrap;
+margin-bottom:6px;
+}
+
+input,select{
+padding:7px;
+border:none;
+border-radius:6px;
+background:#2a2d36;
+color:white;
+font-size:12px;
+}
+
+button{
+height:36px;
+padding:0 12px;
+border:none;
+border-radius:18px;
+background:#2962ff;
+color:white;
+font-size:12px;
+cursor:pointer;
+}
+
+.charts{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+margin-bottom:10px;
+}
+
+.chartbox{
+background:#1a1d26;
+padding:10px;
+border-radius:10px;
+height:260px;
+}
+
+.trade-log{
+background:#1a1d26;
+padding:8px;
+border-radius:10px;
+}
+
+.loghead{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:8px;
+}
+
+.logtools{
+display:flex;
+gap:8px;
+align-items:center;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+font-size:12px;
+}
+
+th{
+background:#2962ff;
+padding:8px;
+font-weight:normal;
+}
+
+td{
+padding:7px;
+border-bottom:1px solid #333;
+text-align:center;
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOP -->
+
+<div class="topbar">
+
+<h1>RR Monitor Terminal</h1>
+
+<div class="righttools">
+
+<div class="labelwrap">
+<div>LIVE</div>
+
+{% if live_master == "ON" %}
+<a href="/toggle_live" class="switch3d switch-on">
+<div class="txt">ON</div>
+<div class="knob"></div>
+</a>
+{% else %}
+<a href="/toggle_live" class="switch3d switch-off">
+<div class="knob"></div>
+<div class="txt">OFF</div>
+</a>
+{% endif %}
+
+</div>
+
+<a href="/logout"><button class="btnsm logout">Logout</button></a>
+
+</div>
+
+</div>
+
+<!-- KPI -->
+
+<div class="grid">
+
+<div class="card">Trades<div class="value blue">{{ total_trades }}</div></div>
+<div class="card">Wins<div class="value green">{{ wins }}</div></div>
+<div class="card">Loss<div class="value red">{{ losses }}</div></div>
+<div class="card">Win %<div class="value blue">{{ win_rate }}</div></div>
+<div class="card">Open<div class="value">{{ open_trades }}</div></div>
+<div class="card">P&L<div class="value {% if total_pnl>=0 %}green{% else %}red{% endif %}">₹{{ total_pnl }}</div></div>
+
+</div>
+
+<!-- PANEL -->
+
+<div class="panel">
+
+<form method="post" action="/save_settings">
+
+<div class="row">
+
+<select name="trade_mode">
+<option>PAPER</option>
+<option>LIVE</option>
+</select>
+
+<select name="trail_on">
+<option>ON</option>
+<option>OFF</option>
+</select>
+
+<input name="capital" value="{{ capital }}">
+<input name="parts" value="{{ parts }}">
+<input name="trail_trigger" value="1">
+<input name="trail_move" value="0.5">
+<input name="breakeven_trigger" value="2">
+
+<button>Save</button>
+
+</div>
+
+</form>
+
+<div class="row">
+
+<form method="post" action="/add_trade">
+
+<input name="symbol" placeholder="Symbol">
+
+<select name="side">
+<option>LONG</option>
+<option>SHORT</option>
+</select>
+
+<input name="entry" placeholder="Entry">
+<input name="sl" placeholder="SL">
+<input name="rr" value="2">
+
+<button>Add Trade</button>
+
+</form>
+
+<form method="post" action="/update_price">
+
+<input name="price" placeholder="Price">
+<button>Update</button>
+
+</form>
+
+</div>
+
+</div>
+
+<!-- CHART -->
+
+<div class="charts">
+
+<div class="chartbox"><canvas id="curve"></canvas></div>
+<div class="chartbox"><canvas id="wl"></canvas></div>
+
+</div>
+
+<!-- LOG -->
+
+<div class="trade-log">
+
+<div class="loghead">
+
+<h3 style="margin:0;">Trade Logs</h3>
+
+<div class="logtools">
+
+<!-- AUTO SYNC -->
+{% if live_master == "ON" %}
+<a href="/dashboard?view_mode=LIVE" class="switch3d switch-on">
+<div class="txt">LIVE</div>
+<div class="knob"></div>
+</a>
+{% else %}
+<a href="/dashboard?view_mode=PAPER" class="switch3d switch-off">
+<div class="knob"></div>
+<div class="txt">PAPER</div>
+</a>
+{% endif %}
+
+<a href="/reset_trades"><button class="btnsm redbtn">Reset Logs</button></a>
+<a href="/export_csv"><button class="btnsm gray">Excel</button></a>
+
+</div>
+
+</div>
+
+<table>
+
+<tr>
+<th>ID</th>
+<th>Mode</th>
+<th>Symbol</th>
+<th>Side</th>
+<th>Qty</th>
+<th>Entry</th>
+<th>SL</th>
+<th>Target</th>
+<th>Status</th>
+<th>P&L</th>
+</tr>
+
+{% for t in trades %}
+<tr>
+<td>{{ t.id }}</td>
+<td>{{ t.mode }}</td>
+<td>{{ t.symbol }}</td>
+<td>{{ t.side }}</td>
+<td>{{ t.qty }}</td>
+<td>{{ t.entry }}</td>
+<td>{{ t.sl }}</td>
+<td>{{ t.target }}</td>
+<td>{{ t.status }}</td>
+<td class="{% if t.pnl>=0 %}green{% else %}red{% endif %}">
+{{ t.pnl }}
+</td>
+</tr>
+{% endfor %}
+
+</table>
+
+</div>
+
+<script>
+new Chart(document.getElementById('curve'),{
+type:'line',
+data:{
+labels:[{% for i in equity_curve %}"{{ loop.index }}",{% endfor %}],
+datasets:[{
+data:[{% for i in equity_curve %}{{ i }},{% endfor %}],
+borderColor:'#00e676',
+tension:.2
+}]
+},
+options:{plugins:{legend:{display:false}},maintainAspectRatio:false}
+});
+
+new Chart(document.getElementById('wl'),{
+type:'doughnut',
+data:{
+labels:['Wins','Loss'],
+datasets:[{
+data:[{{ wins }},{{ losses }}],
+backgroundColor:['#00e676','#ff5252']
+}]
+},
+options:{maintainAspectRatio:false}
+});
+</script>
+
+</body>
+</html>
