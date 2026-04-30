@@ -1,9 +1,10 @@
-from flask import render_template, request, redirect, session, send_file
+from flask import render_template, request, redirect, session, send_file, jsonify
 from database import connect
 from datetime import datetime
 import math
 import os
 from openpyxl import Workbook
+from fyers_apiv3 import fyersModel
 
 LOT_SIZES = {
     "NIFTY": 60,
@@ -12,6 +13,23 @@ LOT_SIZES = {
 }
 
 
+# ================= FYERS CLIENT =================
+def get_fyers_client():
+    token = session.get("fyers_access_token")
+
+    if not token:
+        return None
+
+    client_id = os.getenv("FYERS_APP_ID")
+
+    return fyersModel.FyersModel(
+        client_id=client_id,
+        token=token,
+        log_path=""
+    )
+
+
+# ================= LOT LOGIC =================
 def get_lot(symbol):
     symbol = symbol.upper()
     for k in LOT_SIZES:
@@ -34,6 +52,7 @@ def calc_qty(symbol, entry, capital):
     return max(qty, 1)
 
 
+# ================= ROUTES =================
 def trade_routes(app):
 
     # ================= DASHBOARD =================
@@ -62,7 +81,6 @@ def trade_routes(app):
         trail_on = s[3]
         live_master = s[7]
 
-        # AUTO VIEW SYNC
         view_mode = "LIVE" if live_master == "ON" else "PAPER"
 
         cur.execute("""
@@ -82,7 +100,6 @@ def trade_routes(app):
         running = 0
 
         for r in rows:
-
             pnl = r[10]
             status = r[9]
 
@@ -124,7 +141,7 @@ def trade_routes(app):
             losses=losses,
             win_rate=win_rate,
             open_trades=open_trades,
-            total_pnl=round(pnl_total,2),
+            total_pnl=round(pnl_total, 2),
             equity_curve=equity,
             capital=capital,
             parts=parts,
@@ -134,60 +151,39 @@ def trade_routes(app):
             view_mode=view_mode
         )
 
-    # ================= TOGGLE LIVE =================
-    @app.route("/toggle_live")
-    def toggle_live():
+    # ================= FYERS SYNC =================
 
-        conn = connect()
-        cur = conn.cursor()
+    @app.route("/sync-positions")
+    def sync_positions():
+        fyers = get_fyers_client()
 
-        cur.execute("SELECT live_master FROM settings WHERE id=1")
-        old = cur.fetchone()[0]
+        if not fyers:
+            return jsonify({"error": "FYERS not logged in"})
 
-        new = "ON" if old == "OFF" else "OFF"
+        response = fyers.positions()
+        return jsonify(response)
 
-        cur.execute("""
-        UPDATE settings
-        SET live_master=?
-        WHERE id=1
-        """, (new,))
+    @app.route("/sync-orders")
+    def sync_orders():
+        fyers = get_fyers_client()
 
-        conn.commit()
-        conn.close()
+        if not fyers:
+            return jsonify({"error": "FYERS not logged in"})
 
-        return redirect("/dashboard")
+        response = fyers.orderbook()
+        return jsonify(response)
 
-    # ================= SAVE SETTINGS =================
-    @app.route("/save_settings", methods=["POST"])
-    def save_settings():
+    @app.route("/get-ltp/<symbol>")
+    def get_ltp(symbol):
+        fyers = get_fyers_client()
 
-        conn = connect()
-        cur = conn.cursor()
+        if not fyers:
+            return jsonify({"error": "FYERS not logged in"})
 
-        cur.execute("""
-        UPDATE settings
-        SET trade_mode=?,
-        capital=?,
-        parts=?,
-        trail_on=?,
-        trail_trigger=?,
-        trail_move=?,
-        breakeven_trigger=?
-        WHERE id=1
-        """, (
-            request.form["trade_mode"],
-            float(request.form["capital"]),
-            int(request.form["parts"]),
-            request.form["trail_on"],
-            float(request.form["trail_trigger"]),
-            float(request.form["trail_move"]),
-            float(request.form["breakeven_trigger"])
-        ))
+        data = {"symbols": symbol}
+        response = fyers.quotes(data)
 
-        conn.commit()
-        conn.close()
-
-        return redirect("/dashboard")
+        return jsonify(response)
 
     # ================= ADD TRADE =================
     @app.route("/add_trade", methods=["POST"])
@@ -213,7 +209,6 @@ def trade_routes(app):
         parts = s[1]
         live_master = s[2]
 
-        # AUTO MODE SYNC
         mode = "LIVE" if live_master == "ON" else "PAPER"
 
         if parts <= 0:
@@ -240,7 +235,7 @@ def trade_routes(app):
             qty,
             entry,
             sl,
-            round(target,2),
+            round(target, 2),
             rr,
             "OPEN",
             0,
@@ -253,13 +248,7 @@ def trade_routes(app):
 
         return redirect("/dashboard")
 
-    # ================= UPDATE PRICE =================
-    @app.route("/update_price", methods=["POST"])
-    def update_price():
-
-        return redirect("/dashboard")
-
-    # ================= RESET CURRENT MODE =================
+    # ================= RESET =================
     @app.route("/reset_trades")
     def reset_trades():
 
@@ -278,7 +267,7 @@ def trade_routes(app):
 
         return redirect("/dashboard")
 
-    # ================= EXCEL EXPORT =================
+    # ================= EXPORT =================
     @app.route("/export_csv")
     def export_csv():
 
@@ -302,15 +291,11 @@ def trade_routes(app):
         ws2.append(headers)
 
         cur.execute("SELECT * FROM trades WHERE mode='PAPER'")
-        paper = cur.fetchall()
-
-        for row in paper:
+        for row in cur.fetchall():
             ws1.append(row)
 
         cur.execute("SELECT * FROM trades WHERE mode='LIVE'")
-        live = cur.fetchall()
-
-        for row in live:
+        for row in cur.fetchall():
             ws2.append(row)
 
         conn.close()
