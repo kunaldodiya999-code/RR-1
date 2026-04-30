@@ -1,4 +1,3 @@
-
 from flask import render_template, request, redirect, session
 
 USERNAME = "admin"
@@ -12,49 +11,22 @@ def auth_routes(app):
             return redirect("/dashboard")
         return render_template("login.html")
 
-    @app.route("/login", methods=["POST"])
+    @app.route("/login", methods=["GET", "POST"])
     def login():
+        if request.method == "POST":
+            user = request.form.get("username")
+            pwd = request.form.get("password")
 
-        user = request.form["username"]
-        pwd = request.form["password"]
+            if user == USERNAME and pwd == PASSWORD:
+                session["user"] = user
+                return redirect("/fyers-login")   # ✅ IMPORTANT CHANGE
 
-        if user == USERNAME and pwd == PASSWORD:
-            session["user"] = user
-            return redirect("/dashboard")
+            return "Wrong Login"
 
-        return "Wrong Login"
+        return render_template("login.html")   # ✅ Handles GET request
 
     @app.route("/logout")
     def logout():
         session.pop("user", None)
-
-from flask import render_template, request, redirect, session
-
-USERNAME = "admin"
-PASSWORD = "1234"
-
-def auth_routes(app):
-
-    @app.route("/")
-    def home():
-        if "user" in session:
-            return redirect("/dashboard")
-        return render_template("login.html")
-
-    @app.route("/login", methods=["POST"])
-    def login():
-
-        user = request.form["username"]
-        pwd = request.form["password"]
-
-        if user == USERNAME and pwd == PASSWORD:
-            session["user"] = user
-            return redirect("/dashboard")
-
-        return "Wrong Login"
-
-    @app.route("/logout")
-    def logout():
-        session.pop("user", None)
-
+        session.pop("fyers_access_token", None)  # optional cleanup
         return redirect("/")
