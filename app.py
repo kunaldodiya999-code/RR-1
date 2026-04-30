@@ -7,18 +7,14 @@ import os
 app = Flask(__name__)
 app.secret_key = "rrmonitorsecret"
 
+# Initialize DB
 init_db()
 
+# Register routes
 auth_routes(app)
 trade_routes(app)
 
-
-@app.route("/")
-def root():
-    if "user" in session:
-        return redirect("/dashboard")
-    return redirect("/login")
-
+# ================= FYERS LOGIN =================
 
 @app.route("/fyers-login")
 def fyers_login():
@@ -36,8 +32,7 @@ def fyers_login():
         grant_type="authorization_code"
     )
 
-    auth_url = fyers.generate_authcode()
-    return redirect(auth_url)
+    return redirect(fyers.generate_authcode())
 
 
 @app.route("/fyers-callback")
@@ -74,9 +69,7 @@ def fyers_callback():
     return f"FYERS Login Failed: {token_response}"
 
 
+# ================= LOCAL RUN =================
+
 if __name__ == "__main__":
-
-    app.run()
-
-    app.run(host="0.0.0.0", port=5000, debug=True)
-
+    app.run(host="0.0.0.0", port=5000)
